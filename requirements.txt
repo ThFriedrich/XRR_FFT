@@ -1,0 +1,4 @@
+numpy
+scipy
+matplotlib
+Dans_Diffraction
