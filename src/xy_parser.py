@@ -13,15 +13,27 @@ class XYParser:
     def parse(self, file):
         meta = {}
         data_raw_t = {}
-        with open(file, "r") as f:
+        
+        if isinstance(file, str):
+            open_file = open(file, "r")
+            ds_name = os.path.basename(file).split(".")[0]
+        else:
+            open_file = file
+            ds_name = "byteio_data"
+        
+        with open_file as f:
             first_line = f.readline().strip()
-            matches = self.pattern.findall(first_line)
+            matches = self.pattern.findall(str(first_line))
             for key, value in matches:
                 try:
                     value = float(value)
                 except ValueError:
                     pass
                 meta[key] = value
-        ds_name = os.path.basename(file).split(".")[0]
-        data_raw_t[ds_name] = np.loadtxt(file, skiprows=1)
+            
+            if isinstance(file, str):
+                data_raw_t[ds_name] = np.loadtxt(file, skiprows=1)
+            else:
+                data_raw_t[ds_name] = np.loadtxt(f, skiprows=1)
+        
         return data_raw_t, meta
