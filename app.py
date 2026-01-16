@@ -1,6 +1,7 @@
 import streamlit as st
 import numpy as np
-import matplotlib.pyplot as plt
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import os
 from src.utils import *
 from src.data_parser import parse_data_bytesIO
@@ -37,37 +38,44 @@ def main():
     with col4:
         relative_density = st.slider("Relative Density", 0.0, 2.0, 1.0)
 
-    if st.button("Run Analysis"):
-        if uploaded_file and cif_file:
-            # cif_stream = cif_file.read()
-            # Read the content of the uploaded file
-            file_content = uploaded_file.read()
-            file_type = uploaded_file.name.split(".")[-1]
-            data_raw, data_meta = parse_data_bytesIO(io.BytesIO(file_content),file_type)
-            if len(data_raw) == 0:
-                st.warning(f"No data found in {uploaded_file.name}. Skipping.")
-
-            fig, ax = plt.subplots(len(data_raw), 2, squeeze=False)
-
+    if uploaded_file and cif_file:
+        # Read the content of the uploaded file
+        file_content = uploaded_file.read()
+        file_type = uploaded_file.name.split(".")[-1]
+        data_raw, data_meta = parse_data_bytesIO(io.BytesIO(file_content),file_type)
+        if len(data_raw) == 0:
+            st.warning(f"No data found in {uploaded_file.name}. Skipping.")
+        else:
+            sample = os.path.basename(uploaded_file.name).split(".")[0]
+            
             for id, dataset in enumerate(data_raw):
                 data = data_raw[dataset]
                 if np.size(data) < 100:
                     st.warning(f"Dataset {id} in {uploaded_file.name} has insufficient data points. Skipping.")
+                    continue
 
                 XRR_FT, ds, Meta = XRR_FFT_Analysis(data, data_meta, cif_path, min_peak_prominence, relative_density)
                 Meta["dataset"] = dataset
-                plot_XRR(data, Meta, XRR_FT, ds, ax[id])
+                
+                # Create a separate figure for each dataset
+                fig = make_subplots(
+                    rows=1, cols=2,
+                    subplot_titles=["XRR data", "FFT of XRR data"],
+                    horizontal_spacing=0.12
+                )
+                
+                plot_XRR_plotly(data, Meta, XRR_FT, ds, fig, 1)
+                
+                fig.update_layout(
+                    title_text=f"{sample} - {dataset}",
+                    height=500,
+                    showlegend=True
+                )
 
-            sample = os.path.basename(uploaded_file.name).split(".")[0]
-            fig.suptitle(sample)
-            fig.set_size_inches(14, len(data_raw) * 5)
-            fig.tight_layout(pad=0.5)
-
-            # Display the plot in Streamlit
-            st.pyplot(fig)
-            plt.close(fig)
+                # Display the plot in Streamlit
+                st.plotly_chart(fig, use_container_width=True, key=f"xrr_plot_{id}")
     else:
-        st.error("Upload a cif-file and a data-file and click 'Run Analysis' to start the analysis.")
+        st.info("Please upload a CIF file and a data file to start the analysis.")
 
 if __name__ == "__main__":
     main()
