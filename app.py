@@ -72,8 +72,18 @@ def main():
                     showlegend=True
                 )
 
+                # Configure plotly modbar with SVG download option
+                config = {
+                    'toImageButtonOptions': {
+                        'format': 'svg',
+                        'filename': f'xrr_fft_analysis_{sample}_{dataset}',
+                        'scale': 2
+
+                    }
+                }
+
                 # Display the plot in Streamlit
-                st.plotly_chart(fig, use_container_width=True, key=f"xrr_plot_{id}")
+                st.plotly_chart(fig, use_container_width=True, key=f"xrr_plot_{id}", config=config)
     else:
         st.info("Please upload a CIF file and a data file to start the analysis.")
 
