@@ -2,7 +2,6 @@ from Dans_Diffraction import Crystal
 from Dans_Diffraction.functions_crystallography import wave2energy, molecular_refractive_index
 import numpy as np
 import scipy as scp
-from scipy import *
 import scipy.optimize as optimize
 import scipy.signal.windows as fft_windows
 
@@ -94,7 +93,7 @@ def fit_peaks(x, y, p0, min_peak_prominnence=0.15):
     msk_pk = np.logical_and(x > 3, x < 100) 
     # Find the peaks
     dx = x[1]-x[0]
-    pk_id, meta = scp.signal.find_peaks(y*msk_pk,prominence=np.max(y*msk_pk)*min_peak_prominnence, distance=5/dx)
+    pk_id, meta = scp.signal.find_peaks(y*msk_pk,prominence=np.max(y*msk_pk)*min_peak_prominnence, distance=2.5/dx)
     #filter out peaks on left edge
     bool_edge_pk = pk_id == np.argmax(msk_pk)
     pk_id = pk_id[~bool_edge_pk]
