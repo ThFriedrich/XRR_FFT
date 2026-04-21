@@ -9,10 +9,32 @@ def mol_refractive_index(cif_file, lambda_xray, relative_density=1.0):
     xtl = Crystal(cif_file)   
     energy = wave2energy(lambda_xray)   # keV
     density = xtl.Properties.density() * relative_density # g/cm^3
-    n, Delta, Beta = molecular_refractive_index(xtl.Properties.xtl.cif['_chemical_formula_structural'], energy, density)
+    
+    # Try to get chemical formula from CIF file
+    cif_dict = xtl.Properties.xtl.cif
+    chem_formula = None
+    
+    # Try multiple possible keys for chemical formula
+    if '_chemical_formula_structural' in cif_dict:
+        chem_formula = cif_dict['_chemical_formula_structural']
+    elif '_chemical_formula_sum' in cif_dict:
+        chem_formula = cif_dict['_chemical_formula_sum']
+    elif 'chemical_formula_structural' in cif_dict:
+        chem_formula = cif_dict['chemical_formula_structural']
+    elif 'chemical_formula_sum' in cif_dict:
+        chem_formula = cif_dict['chemical_formula_sum']
+    
+    # If still no formula found, try to construct it from the crystal structure
+    if chem_formula is None:
+        try:
+            chem_formula = str(xtl.Atoms.formula())
+        except:
+            chem_formula = str(xtl)
+    
+    n, Delta, Beta = molecular_refractive_index(chem_formula, energy, density)
     Theta_crit = np.rad2deg(np.sqrt(2*Delta))*2
     
-    return Delta, Theta_crit, xtl.Properties.xtl.cif['_chemical_formula_structural']
+    return Delta, Theta_crit, chem_formula
 
 # https://opara.zih.tu-dresden.de/xmlui/handle/123456789/1804 
 def XRR(data, crit_ang, lambda_xray=1.51):
