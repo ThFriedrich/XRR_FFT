@@ -5,35 +5,52 @@ import scipy as scp
 import scipy.optimize as optimize
 import scipy.signal.windows as fft_windows
 
-def mol_refractive_index(cif_file, lambda_xray, relative_density=1.0):
-    xtl = Crystal(cif_file)   
-    energy = wave2energy(lambda_xray)   # keV
-    density = xtl.Properties.density() * relative_density # g/cm^3
-    
-    # Try to get chemical formula from CIF file
+
+# Kα1 wavelengths in Å for common X-ray tube anodes
+ANODE_WAVELENGTHS = {
+    "Cu": 1.54056,
+    "Mo": 0.70930,
+    "Co": 1.78897,
+    "Cr": 2.28970,
+    "Fe": 1.93604,
+    "Ag": 0.55941,
+    "W":  1.47640,
+}
+
+
+def density_from_cif(cif_file):
+    """
+    Extract chemical formula and density (g/cm^3) from a CIF file.
+    """
+    xtl = Crystal(cif_file)
+    density = float(xtl.Properties.density())
+
     cif_dict = xtl.Properties.xtl.cif
     chem_formula = None
-    
-    # Try multiple possible keys for chemical formula
-    if '_chemical_formula_structural' in cif_dict:
-        chem_formula = cif_dict['_chemical_formula_structural']
-    elif '_chemical_formula_sum' in cif_dict:
-        chem_formula = cif_dict['_chemical_formula_sum']
-    elif 'chemical_formula_structural' in cif_dict:
-        chem_formula = cif_dict['chemical_formula_structural']
-    elif 'chemical_formula_sum' in cif_dict:
-        chem_formula = cif_dict['chemical_formula_sum']
-    
-    # If still no formula found, try to construct it from the crystal structure
+    for key in (
+        '_chemical_formula_structural', '_chemical_formula_sum',
+        'chemical_formula_structural', 'chemical_formula_sum',
+    ):
+        if key in cif_dict:
+            chem_formula = cif_dict[key]
+            break
     if chem_formula is None:
         try:
             chem_formula = str(xtl.Atoms.formula())
-        except:
+        except Exception:
             chem_formula = str(xtl)
-    
+    # Sanitize formula: strip quotes/whitespace
+    chem_formula = str(chem_formula).strip().strip("'\"").replace(" ", "")
+    return chem_formula, density
+
+
+def mol_refractive_index(chem_formula, lambda_xray, density):
+    energy = wave2energy(lambda_xray)   # keV
+    if not chem_formula or not str(chem_formula).strip():
+        chem_formula = "Si"
     n, Delta, Beta = molecular_refractive_index(chem_formula, energy, density)
     Theta_crit = np.rad2deg(np.sqrt(2*Delta))*2
-    
+
     return Delta, Theta_crit, chem_formula
 
 # https://opara.zih.tu-dresden.de/xmlui/handle/123456789/1804 
@@ -164,7 +181,7 @@ def fit_peaks(x, y, p0, min_peak_prominnence=0.15):
     return d, fit_curves, fit_model, R2
 
 
-def XRR_FFT_Analysis(data, meta, cif_file, min_peak_prominnence=0.15, relative_density=0.0):
+def XRR_FFT_Analysis(data, meta, chem_formula, min_peak_prominnence=0.15, density=2.33, anode="Cu", lam=None):
     """
     Analyzes XRR data using a Fourier analysis
     """
@@ -176,14 +193,17 @@ def XRR_FFT_Analysis(data, meta, cif_file, min_peak_prominnence=0.15, relative_d
     
     twottheta = data[:, 0]
     intensity = data[:, 1]
-    if "alpha_average" in meta:
-        lam = meta["alpha_average"]
-    elif "alpha1" in meta:
-        lam = meta["alpha1"]
-    elif "Wavelength" in meta:
-        lam = meta["Wavelength"]
+    if lam is None:
+        if "alpha_average" in meta:
+            lam = meta["alpha_average"]
+        elif "alpha1" in meta:
+            lam = meta["alpha1"]
+        elif "Wavelength" in meta:
+            lam = meta["Wavelength"]
+        else:
+            lam = ANODE_WAVELENGTHS.get(anode, ANODE_WAVELENGTHS["Cu"])
 
-    Meta['delt_th'], Meta['crit_ang'], Meta['chem_formula'] = mol_refractive_index(cif_file, lam, relative_density)
+    Meta['delt_th'], Meta['crit_ang'], Meta['chem_formula'] = mol_refractive_index(chem_formula, lam, density)
     
     Meta['I_at_crit'] = np.interp(Meta['crit_ang'], twottheta, intensity)
 
